@@ -1,12 +1,33 @@
 # sync-chat
 
-Keep your AI agent chat history in sync across devices via git.
+Sync AI agent chat history via git — across devices and across your team.
 
-When you work on the same repository from multiple machines, conversation history with agents like **GitHub Copilot** and **Cursor** stays local and gets lost when you switch devices. `sync-chat` hooks into the agent lifecycle to automatically copy session transcripts into your repository's `.chat-sync/` directory — so a simple `git pull` on another machine restores your full chat history.
+Chat history with agents like **GitHub Copilot** and **Cursor** is stored locally by default: it disappears when you switch machines, and teammates can't see it at all. `sync-chat` hooks into the agent lifecycle to automatically copy session transcripts into your repository's `.chat-sync/` directory, versioned alongside your code. Typical use cases:
+
+- **Multiple devices**: seamlessly continue conversations between your work and home machines
+- **Team collaboration**: decisions, dead ends, and context built up with an agent get pushed to git and pulled down by teammates — no need to re-explain the background
 
 ## How it works
 
-`sync-chat` installs two shell scripts and two hook configuration files into your project:
+### The idea
+
+Agent chat transcripts are just files (`.jsonl`). `sync-chat` copies them into a `.chat-sync/` directory inside your repository. Once there, they follow the same git workflow as your code — commit, push, pull — and any machine or teammate that has the repo also has the full conversation history. On the receiving end, the transcripts are copied back into the agent's local storage so they show up in the chat history panel as if they had always been there.
+
+Transcripts are stored in **agent-specific subdirectories** (`.chat-sync/copilot/`, `.chat-sync/cursor/`) to keep things clean. Commits and pushes are intentionally **left to you** — sync-chat never runs any git command automatically.
+
+### Two ways to sync
+
+`sync-chat` provides two approaches to move transcripts in and out of `.chat-sync/`. You can use either or both:
+
+| | Agent hooks (automatic) | CLI commands (manual) |
+|---|---|---|
+| **How it works** | Hook config files tell the agent to run `export.sh` / `restore.sh` at session end / session start. Completely transparent — no plugin needed. | Run `npx sync-chat export` or `npx sync-chat restore` yourself whenever you want. |
+| **User experience** | Zero friction. Transcripts appear in `.chat-sync/` after every session without you doing anything. | On-demand. Useful when hooks aren't available, or if you prefer explicit control. |
+| **Requires** | Agent must support hooks (Copilot and Cursor both do). | Node.js ≥ 16. |
+
+### Hooks in detail
+
+Both Copilot and Cursor expose a **hook system** that lets you run shell commands at specific lifecycle events. `sync-chat` installs two hook config files and two scripts into your project:
 
 ```
 your-project/
@@ -22,11 +43,7 @@ Each hook config passes `--agent <name>` explicitly to the scripts, so agent det
 | Event | Agent | Script | What happens |
 |-------|-------|--------|--------------|
 | Session ends | Copilot `Stop` / Cursor `sessionEnd` | `export.sh` | Reads `transcript_path` from stdin, copies the `.jsonl` to `.chat-sync/<agent>/` |
-| Session starts | Copilot `SessionStart` / Cursor `sessionStart` | `restore.sh` | Copies `.chat-sync/<agent>/*.jsonl` back into the agent's local storage; skips files that are already up to date |
-
-Transcripts are stored in **agent-specific subdirectories** (`.chat-sync/copilot/`, `.chat-sync/cursor/`) to prevent cross-agent pollution.
-
-Commits and pushes are intentionally **left to you** — sync-chat never runs `git` commands automatically.
+| Session starts | Copilot `SessionStart` / Cursor `sessionStart` | `restore.sh` | Copies `.chat-sync/<agent>/*.jsonl` back into the agent's local storage; skips unchanged files |
 
 ## Requirements
 
