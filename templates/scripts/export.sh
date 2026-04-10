@@ -4,6 +4,16 @@
 
 INPUT=$(cat)
 
+# Parse --agent <name> argument (passed explicitly by each hook config)
+AGENT=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --agent) AGENT="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[ -z "$AGENT" ] && AGENT="unknown"
+
 # Extract transcript_path from stdin JSON
 TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
@@ -20,19 +30,17 @@ fi
 [ ! -f "$TRANSCRIPT_PATH" ] && exit 0
 
 # Determine workspace root
-if [ -n "${CURSOR_PROJECT_DIR:-}" ]; then
-  WORKSPACE="$CURSOR_PROJECT_DIR"
-else
-  WORKSPACE=$(printf '%s' "$INPUT" | python3 -c "
+WORKSPACE=$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-print(d.get('cwd') or '')
+print(d.get('cwd') or (d.get('workspace_roots') or [''])[0] or '')
 " 2>/dev/null || true)
-fi
-
+# Cursor provides this env var; use it as a fallback
+[ -z "$WORKSPACE" ] && WORKSPACE="${CURSOR_PROJECT_DIR:-}"
 [ -z "$WORKSPACE" ] && WORKSPACE="$PWD"
 
-SYNC_DIR="$WORKSPACE/.chat-sync"
+# Write to agent-specific subdirectory to avoid cross-agent pollution
+SYNC_DIR="$WORKSPACE/.chat-sync/$AGENT"
 mkdir -p "$SYNC_DIR"
 
 DEST="$SYNC_DIR/$(basename "$TRANSCRIPT_PATH")"

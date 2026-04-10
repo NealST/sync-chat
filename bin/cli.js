@@ -147,7 +147,8 @@ function runInstall(args) {
 function runExport() {
   const projectPath = process.cwd();
   const syncDir     = path.join(projectPath, '.chat-sync');
-  ensureDir(syncDir);
+  const copilotDir  = path.join(syncDir, 'copilot');
+  const cursorDir   = path.join(syncDir, 'cursor');
 
   console.log(`\nExporting chat transcripts → ${bold(syncDir)}\n`);
 
@@ -156,10 +157,11 @@ function runExport() {
   // Copilot
   const chatSessionsDir = findCopilotChatDir(projectPath);
   if (chatSessionsDir && fs.existsSync(chatSessionsDir)) {
+    ensureDir(copilotDir);
     for (const f of fs.readdirSync(chatSessionsDir)) {
       if (!f.endsWith('.jsonl')) continue;
       const src  = path.join(chatSessionsDir, f);
-      const dest = path.join(syncDir, f);
+      const dest = path.join(copilotDir, f);
       if (!filesEqual(src, dest)) {
         fs.copyFileSync(src, dest);
         console.log(`  ${green('export')} [copilot] ${f}`);
@@ -176,9 +178,11 @@ function runExport() {
   const cursorFiles = findCursorTranscriptFiles(projectPath);
   if (cursorFiles.length === 0) {
     console.log(`  ${yellow('skip')}  [cursor]  no agent transcripts found for this project`);
+  } else {
+    ensureDir(cursorDir);
   }
   for (const { sessionId, file } of cursorFiles) {
-    const dest = path.join(syncDir, `${sessionId}.jsonl`);
+    const dest = path.join(cursorDir, `${sessionId}.jsonl`);
     if (!filesEqual(file, dest)) {
       fs.copyFileSync(file, dest);
       console.log(`  ${green('export')} [cursor]  ${sessionId}.jsonl`);
@@ -203,51 +207,68 @@ function runExport() {
 function runRestore() {
   const projectPath = process.cwd();
   const syncDir     = path.join(projectPath, '.chat-sync');
+  const copilotDir  = path.join(syncDir, 'copilot');
+  const cursorDir   = path.join(syncDir, 'cursor');
 
-  const syncFiles = fs.existsSync(syncDir)
-    ? fs.readdirSync(syncDir).filter((f) => f.endsWith('.jsonl'))
+  const copilotFiles = fs.existsSync(copilotDir)
+    ? fs.readdirSync(copilotDir).filter((f) => f.endsWith('.jsonl'))
+    : [];
+  const cursorFiles = fs.existsSync(cursorDir)
+    ? fs.readdirSync(cursorDir).filter((f) => f.endsWith('.jsonl'))
     : [];
 
-  if (syncFiles.length === 0) {
+  if (copilotFiles.length === 0 && cursorFiles.length === 0) {
     console.log('\nNothing to restore — .chat-sync/ has no .jsonl files.\n');
     return;
   }
 
-  console.log(`\nRestoring ${syncFiles.length} transcript(s) from ${bold(syncDir)}\n`);
+  console.log(`\nRestoring transcripts from ${bold(syncDir)}\n`);
 
   let total = 0;
 
   // Copilot
-  const chatSessionsDir = findCopilotChatDir(projectPath);
-  if (chatSessionsDir) {
-    ensureDir(chatSessionsDir);
-    for (const f of syncFiles) {
-      const src  = path.join(syncDir, f);
-      const dest = path.join(chatSessionsDir, f);
-      if (!filesEqual(src, dest)) {
-        fs.copyFileSync(src, dest);
-        console.log(`  ${green('restore')} [copilot] ${f}`);
-        total++;
-      }
-    }
+  if (copilotFiles.length === 0) {
+    console.log(`  ${yellow('skip')}  [copilot] no transcripts in .chat-sync/copilot/`);
   } else {
-    console.log(`  ${yellow('skip')}  [copilot] no workspace storage found for this project`);
+    const chatSessionsDir = findCopilotChatDir(projectPath);
+    if (chatSessionsDir) {
+      ensureDir(chatSessionsDir);
+      for (const f of copilotFiles) {
+        const src  = path.join(copilotDir, f);
+        const dest = path.join(chatSessionsDir, f);
+        if (!filesEqual(src, dest)) {
+          fs.copyFileSync(src, dest);
+          console.log(`  ${green('restore')} [copilot] ${f}`);
+          total++;
+        } else {
+          console.log(`  ${yellow('skip')}  [copilot] ${f}  (unchanged)`);
+        }
+      }
+    } else {
+      console.log(`  ${yellow('skip')}  [copilot] no workspace storage found for this project`);
+    }
   }
 
   // Cursor
-  const transcriptsBase = path.join(
-    os.homedir(), '.cursor', 'projects',
-    encodeCursorPath(projectPath), 'agent-transcripts'
-  );
-  for (const f of syncFiles) {
-    const sessionId = path.basename(f, '.jsonl');
-    const src       = path.join(syncDir, f);
-    const dest      = path.join(transcriptsBase, sessionId, f);
-    if (!filesEqual(src, dest)) {
-      ensureDir(path.dirname(dest));
-      fs.copyFileSync(src, dest);
-      console.log(`  ${green('restore')} [cursor]  ${f}`);
-      total++;
+  if (cursorFiles.length === 0) {
+    console.log(`  ${yellow('skip')}  [cursor]  no transcripts in .chat-sync/cursor/`);
+  } else {
+    const transcriptsBase = path.join(
+      os.homedir(), '.cursor', 'projects',
+      encodeCursorPath(projectPath), 'agent-transcripts'
+    );
+    for (const f of cursorFiles) {
+      const sessionId = path.basename(f, '.jsonl');
+      const src       = path.join(cursorDir, f);
+      const dest      = path.join(transcriptsBase, sessionId, f);
+      if (!filesEqual(src, dest)) {
+        ensureDir(path.dirname(dest));
+        fs.copyFileSync(src, dest);
+        console.log(`  ${green('restore')} [cursor]  ${f}`);
+        total++;
+      } else {
+        console.log(`  ${yellow('skip')}  [cursor]  ${f}  (unchanged)`);
+      }
     }
   }
 

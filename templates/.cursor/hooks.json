@@ -3,12 +3,12 @@
   "hooks": {
     "sessionEnd": [
       {
-        "command": "bash ./scripts/export.sh"
+        "command": "bash ./scripts/export.sh --agent cursor"
       }
     ],
     "sessionStart": [
       {
-        "command": "bash ./scripts/restore.sh"
+        "command": "bash ./scripts/restore.sh --agent cursor"
       }
     ]
   }

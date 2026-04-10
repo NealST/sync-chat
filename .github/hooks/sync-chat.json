@@ -3,13 +3,13 @@
     "Stop": [
       {
         "type": "command",
-        "command": "bash ./scripts/export.sh"
+        "command": "bash ./scripts/export.sh --agent copilot"
       }
     ],
     "SessionStart": [
       {
         "type": "command",
-        "command": "bash ./scripts/restore.sh"
+        "command": "bash ./scripts/restore.sh --agent copilot"
       }
     ]
   }
