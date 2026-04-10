@@ -36,22 +36,33 @@ Commits and pushes are intentionally **left to you** — sync-chat never runs `g
 
 ## Installation
 
-In the root of your project, run:
+**Option A — via npm (requires Node.js ≥ 16):**
 
 ```bash
 npx sync-chat
 ```
 
-This copies the hook configs and scripts into the current directory. To install into a different path:
+To install into a different path or overwrite existing files:
 
 ```bash
 npx sync-chat install ./path/to/project
+npx sync-chat install --force
 ```
 
-To overwrite files that already exist:
+**Option B — via curl (no Node.js required):**
 
 ```bash
-npx sync-chat install --force
+bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/sync-chat/main/install.sh)
+```
+
+Same options are supported:
+
+```bash
+# install into a specific directory
+bash <(curl -fsSL ...) ./path/to/project
+
+# overwrite existing files
+bash <(curl -fsSL ...) --force
 ```
 
 After installation, commit the generated files:
